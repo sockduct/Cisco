@@ -1,7 +1,29 @@
 #!/usr/bin/env python
 ####################################################################################################
 #
-'''Example Python program to send commands to a Nexus 7000 using NX-API.'''
+'''Example Python program to send commands to a Nexus 7000 using NX-API.
+
+Future Improvements:
+    * Use argparse to take CLI arguments/parameters
+    * Create change function which is idempotent
+    * Look at creating print function
+    * Include examples/test cases:
+    ** Setup VLAN
+    ** Setup new loopback
+    * Look into supporting object based rest change
+    * Look into supporting authentication token vs. always posting username/password
+    ** Need to deal with auth token expiring after 10 min
+    ** Perhaps watch for auth token expiry and then re-do - make function or build-in to class?
+    * Test cases such as invalid commands/operations
+    * Need to clearly show case advantages of using NX-API vs. CLI
+    ** Object based modeling & configuration
+    ** Getting data perhaps not available through SNMP, using NX-API that wouldn't be easy to
+       obtain via screen-scraping or CLI, especially if it's on dozens or hundreds of devices
+    *** Spanning Tree changes/issues?
+    ** Way to do transactional config across one or multiple devices
+    ** Showcase deterministic configuration by leveraging error checking
+'''
+
 
 # Imports
 import json
