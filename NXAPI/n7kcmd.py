@@ -31,7 +31,7 @@ import requests
 import sys
 
 # Global Constants
-N7K_ADDR4 = '198.18.1.74'
+N7K_ADDR4 = '198.18.1.77'
 NX_HEADER = {'content-type': 'application/json-rpc'}
 NX_URL = '/ins'
 NX_VER = 1.2
@@ -48,6 +48,51 @@ __contact__ = 'james<dot>r<dot>small<at>outlook<dot>com'
 __date__ = 'June 14, 2016'
 __version__ = '0.0.2'
 
+
+####################################################################################################
+class NX_JRPC_OBJ(object):
+    '''Representation of NX-API JSON-RPC Response Object'''
+
+    def __init__(self, resp_dict):
+        '''Setup Response Object'''
+        self.version = resp_dict['jsonrpc']
+        # Initialize result, error and id, set to None if not present
+        # Note that only result or error will be present
+        self.result = resp_dict.get('result')
+        self.error = resp_dict.get('error')
+        self.ident = resp_dict.get('id')
+
+    def has_error(self):
+        '''Response contains an error?'''
+        # Error is None by default which == False
+        if self.error:
+            return True
+        else:
+            return False
+
+    def get_error(self):
+        '''Return error response'''
+        # Error is None by default which == False
+        if self.has_error():
+            print json.dumps(self.error, sort_keys=True, indent=4)
+        else:
+            raise ValueError('Error not present in response object')
+
+    def has_result(self):
+        '''Response contains a result?'''
+        # Result is None by default which == False
+        if self.result:
+            return True
+        else:
+            return False
+
+    def get_result(self):
+        '''Response contains a result?'''
+        # Result is None by default which == False
+        if self.has_result():
+            print json.dumps(self.result['body'], sort_keys=True, indent=4)
+        else:
+            raise ValueError('Result not present in response object')
 
 ####################################################################################################
 class N7K(object):
@@ -89,10 +134,14 @@ class N7K(object):
                 myrequest.data,
                 '-----------END-----------')
 
-        response = requests.post(myurl, data=json.dumps(payload), \
-                   headers=NX_HEADER, auth=(self.username, self.password)).json()
-
-        return response
+        # POST JSON-RPC request to N7K which results in returned response
+        # Store returned response in a NX_JRPC_OBJ instance and return
+        return NX_JRPC_OBJ(requests.post(myurl,
+                                         data=json.dumps(payload),
+                                         headers=NX_HEADER,
+                                         auth=(self.username, self.password)
+                                        ).json()
+                          )
 
 ####################################################################################################
 def main(args):
