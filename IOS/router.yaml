@@ -1,0 +1,11 @@
+---
+ADDRESS: 127.0.0.1  # Probably different address!
+CONNECTION: ReverseTelnet  # Network|ReverseTelnet
+DESCRIPTION: Cisco Router
+HOSTNAME: router1
+SNMP_COMMUNITY: None
+SNMP_PORT: '161'
+SSH_PORT: None
+TELNET_PORT: '2501'  # '23' or whatever TCP port
+USERNAME: None
+PASSWORD: None  # Careful if put password in file
