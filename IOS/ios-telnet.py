@@ -266,6 +266,8 @@ if __name__ == "__main__":
 # * Logging
 #
 # To do:
-# Incorporate techniques from telnet_pingsweep into class
+# * Incorporate techniques from telnet_pingsweep into class
+# * Add case where no password set:
+#   telnet to router and get:  Password required, but none set
 #
 
