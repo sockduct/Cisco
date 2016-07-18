@@ -269,3 +269,14 @@ def main(args):
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]) or 0)
 
+####################################################################################################
+# Post coding
+#
+# pylint <script>.py
+#   Score should be >= 8.0
+#
+# Future:
+# * Testing - doctest/unittest/other
+# * Logging
+#
+
