@@ -1,7 +1,0 @@
----
-- device_type: 'cisco_ios'
-  hostname: R1
-  ip_addr: 192.0.2.253
-  username: cisco
-  password: cisco
-  port: '23'
