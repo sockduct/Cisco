@@ -45,6 +45,7 @@ IOS_CMD = 'show ip ssh'
 IOS_NOPAGING = 'terminal length 0'
 IOS_PROMPT = r'>|#'  # Assuming prompt consists of "A-Za-z0-9_-"
 NETINFDEVS_FILE = 'netinfdevs.yaml'
+NEWLINE = '\r'
 TELNET_PORT = 23
 TELNET_TIMEOUT = 6
 
@@ -52,7 +53,7 @@ TELNET_TIMEOUT = 6
 __author__ = 'James R. Small'
 __contact__ = 'james<dot>r<dot>small<at>outlook<dot>com'
 __date__ = 'July 11, 2016'
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 
 ####################################################################################################
@@ -123,38 +124,75 @@ class Netinfdev(object):
         #self.username = username
         #self.password = password
         self.netinfdev = netinfdev  # Dictionary which holds all relevant device data
+        if 'USE_USERNAME' not in self.netinfdev:
+            if 'USERNAME' in self.netinfdev:
+                self.netinfdev['USE_USERNAME'] = True
+            else:
+                self.netinfdev['USE_USERNAME'] = False
+        if 'USE_PASSWORD' not in self.netinfdev:
+            if 'PASSWORD' in self.netinfdev:
+                self.netinfdev['USE_PASSWORD'] = True
+            else:
+                self.netinfdev['USE_PASSWORD'] = False
         self.telnet_timeout = telnet_timeout
         self.verbose = verbose
         self.netconn = telnetlib.Telnet()
+        if self.verbose:
+            print('Object values:')
+            print('netinfdev dictionary:\n{}'.format(self.netinfdev))
+            print('telnet timeout:  {}'.format(self.telnet_timeout))
+            print('verbose:  {}\n'.format(self.verbose))
 
-    def _login(self, user_user=True, use_pass=True, verbose=False):
+    def _login(self, verbose=False):
         '''Login to netinfdev node.'''
+        # Debug
+        print('USE_USERNAME:  {}'.format(self.netinfdev['USE_USERNAME']))
+        print('USE_PASSWORD:  {}'.format(self.netinfdev['USE_PASSWORD']))
         # Username?
-        if use_user:
-            if verbose:
+        if self.netinfdev['USE_USERNAME']:
+            if self.verbose:
                 print('Logging in as {}...'.format(self.netinfdev['USERNAME']))
-            self.netconn.write(netinfdev['USERNAME'] + NEWLINE)
+            self.netconn.write(self.netinfdev['USERNAME'] + NEWLINE)
 
         # Password?
-        if use_pass:
+        if self.netinfdev['USE_PASSWORD']:
             output = self.netconn.read_until(PASSWORD_PROMPT, self.telnet_timeout)
-            if verbose:
+            if self.verbose:
                 # Skip first line, node echoing back username
                 secondline = output.find('\n') + 1
                 print('Node password prompt:\n{}'.format(output[secondline:]))
                 print('Submitting password...')
-            self.netconn.write(netinfdev['PASSWORD'] + NEWLINE)
+            self.netconn.write(self.netinfdev['PASSWORD'] + NEWLINE)
 
         # No username/password?
-        if not use_user and not use_pass:
+        if not self.netinfdev['USE_USERNAME'] and not self.netinfdev['USE_PASSWORD']:
+            max_wait = TELNET_TIMEOUT
+            output = ''
+            while max_wait >= 0:
+                # This is sloppy - should check for "reading" EOF, but couldn't
+                # get it to work.  This works for now...
+                try:
+                    buffer = self.netconn.read_very_eager()
+                # Check for EOF (remote end closed connection)
+                # Doesn't work if do it this way...
+                #if buffer == '':
+                #    break
+                    output += buffer
+                # Sleep for 500 ms
+                    time.sleep(0.500)
+                    max_wait -= 0.500
+                except EOFError:
+                    break
             # Need to read input for a few seconds and see if get EOF
             # That case probably = "Password required, but none set"
             # May also want to see a Newline or two in case its an open reverse telnet connection
-            output = self.netconn.read_very_eager()
             # Check if prompt
             # Check for EOF
             # If neither then keep looping until TELNET_TIMEOUT time has passed then abort
             # connection with error...
+            print('Received:\n{}\n'.format(output))
+            # Abort on purpose
+            assert True == False
             #!!!#
 
         output = self.netconn.read_until(LOGIN_PROMPT, TELNET_TIMEOUT)
@@ -194,12 +232,14 @@ class Netinfdev(object):
         '''
         try:
             if self.verbose:
-                print('Trying {}...'.format(self.ip_addr))
-            self.netconn.open(self.ip_addr, TELNET_PORT, TELNET_TIMEOUT)
+                print('Trying {}...'.format(self.netinfdev['MGMTADDR4']))
+            self.netconn.open(self.netinfdev['MGMTADDR4'], TELNET_PORT, TELNET_TIMEOUT)
         except socket.timeout:
             # Don't exit, just print diagnostic to stderr
             #sys.exit('Connection to {} timed-out'.format(self.ip_addr))
-            print('Connection to {} timed-out'.format(self.ip_addr), file=sys.stderr)
+            print('Connection to {} timed-out'.format(self.netinfdev['MGMTADDR4']), file=sys.stderr)
+            print("Please ensure you don't have a host-based firewall/IPS blocking telnet " +
+                  "connections.", file=sys.stderr)
             self.netconn = None
             return None
 
@@ -232,7 +272,7 @@ class Netinfdev(object):
         # Strip off last line - node prompt
         lastline = output.rfind('\n')
         cmd_output = output[:lastline]
-        if verbose:
+        if self.verbose:
             print('Node output:\n{}'.format(cmd_output))
             print('Node prompt (omitted from output):  {}'.format(lastline))
 
@@ -253,7 +293,7 @@ def main(args):
         description='Execute show arp on specified routers')
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('-d', '--datafile', help='specify YAML file to read router info from',
-                        default=IOS_FILE)
+                        default=NETINFDEVS_FILE)
     parser.add_argument('-p', '--port', help='specify telnet port (default is 23)')
     parser.add_argument('--prompt', action='store_true',
                         help='prompt for router info (do not try to read in from file)',
@@ -283,7 +323,9 @@ def main(args):
     for netinfdev in mynetinfdevs:
         # Debugging
         #print('netinfdev:  {}'.format(netinfdev))
-        mynetinfdev = Netinfdev(netinfdev['MGMTADDR4'], netinfdev['username'], netinfdev['password'], args.verbose)
+        ##mynetinfdev = Netinfdev(netinfdev['MGMTADDR4'], netinfdev['USERNAME'], netinfdev['PASSWORD'], args.verbose)
+        #print('args.verbose:  {}'.format(args.verbose))
+        mynetinfdev = Netinfdev(netinfdev, verbose=args.verbose)
         # **netinfdev doesn't work with additional parameter afterwards
         #mynetinfdev = Router(**netinfdev, args.verbose)
         mynetinfdev.telnet_connect()
