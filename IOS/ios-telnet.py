@@ -41,6 +41,7 @@ LOGIN_PROMPT = 'sername:'
 # * password = ACS in use
 # * Password = Local-mode fallback
 PASSWORD_PROMPT = 'assword:'
+IOS_AUTHNOTSETUP = 'password required, but none set'
 IOS_CMD = 'show ip ssh'
 IOS_NOPAGING = 'terminal length 0'
 IOS_PROMPT = r'>|#'  # Assuming prompt consists of "A-Za-z0-9_-"
@@ -53,7 +54,7 @@ TELNET_TIMEOUT = 6
 __author__ = 'James R. Small'
 __contact__ = 'james<dot>r<dot>small<at>outlook<dot>com'
 __date__ = 'July 11, 2016'
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 
 ####################################################################################################
@@ -143,18 +144,29 @@ class Netinfdev(object):
             print('telnet timeout:  {}'.format(self.telnet_timeout))
             print('verbose:  {}\n'.format(self.verbose))
 
-    def _login(self, verbose=False):
+    #def _login(self, verbose=False):
+    def _login(self):
         '''Login to netinfdev node.'''
-        # Debug
-        print('USE_USERNAME:  {}'.format(self.netinfdev['USE_USERNAME']))
-        print('USE_PASSWORD:  {}'.format(self.netinfdev['USE_PASSWORD']))
-        # Username?
+        if self.verbose:
+            print('USE_USERNAME:  {}'.format(self.netinfdev['USE_USERNAME']))
+            print('USE_PASSWORD:  {}'.format(self.netinfdev['USE_PASSWORD']))
+
+        # Three cases which are not mutually exclusive:
+        # 1) Expecting username prompt
+        # 2) Expecting password prompt
+        # 3) Not expecting either a username or password prompt
+
+        # What about auto-sense - use expect with strings to look for user prompt, password prompt
+        # or IOS_PROMPT (already logged in - e.g., open reverse telnet session)
+
+        # Case 1 - Username Prompt
         if self.netinfdev['USE_USERNAME']:
+            output = self.netconn.read_until(LOGIN_PROMPT, TELNET_TIMEOUT)
             if self.verbose:
                 print('Logging in as {}...'.format(self.netinfdev['USERNAME']))
             self.netconn.write(self.netinfdev['USERNAME'] + NEWLINE)
 
-        # Password?
+        # Case 2 - Password Prompt
         if self.netinfdev['USE_PASSWORD']:
             output = self.netconn.read_until(PASSWORD_PROMPT, self.telnet_timeout)
             if self.verbose:
@@ -164,65 +176,97 @@ class Netinfdev(object):
                 print('Submitting password...')
             self.netconn.write(self.netinfdev['PASSWORD'] + NEWLINE)
 
-        # No username/password?
-        if not self.netinfdev['USE_USERNAME'] and not self.netinfdev['USE_PASSWORD']:
-            max_wait = TELNET_TIMEOUT
-            output = ''
-            while max_wait >= 0:
-                # This is sloppy - should check for "reading" EOF, but couldn't
-                # get it to work.  This works for now...
-                try:
-                    buffer = self.netconn.read_very_eager()
-                # Check for EOF (remote end closed connection)
-                # Doesn't work if do it this way...
-                #if buffer == '':
-                #    break
-                    output += buffer
-                # Sleep for 500 ms
-                    time.sleep(0.500)
-                    max_wait -= 0.500
-                except EOFError:
-                    break
-            # Need to read input for a few seconds and see if get EOF
-            # That case probably = "Password required, but none set"
-            # May also want to see a Newline or two in case its an open reverse telnet connection
-            # Check if prompt
-            # Check for EOF
-            # If neither then keep looping until TELNET_TIMEOUT time has passed then abort
-            # connection with error...
-            print('Received:\n{}\n'.format(output))
-            # Abort on purpose
-            assert True == False
-            #!!!#
+        # Case 3 - Neither username nor password prompt expected
+        #   Potential Problems:  For IOS devices, if some form of authentication is required
+        #                        but nothing is setup (in many cases this is the default) then
+        #                        upon connecting the device will return, "Password required,
+        #                        but none set" and subsequently disconnect
+        #   Handle implicitly - check for "IOS_AUTHNOTSETUP" string while looking for netinfdev
+        #                       prompt.
 
-        output = self.netconn.read_until(LOGIN_PROMPT, TELNET_TIMEOUT)
+        #if not self.netinfdev['USE_USERNAME'] and not self.netinfdev['USE_PASSWORD']:
+        #    max_wait = TELNET_TIMEOUT
+        #    output = ''
+        #    while max_wait >= 0:
+        #       # This is perhaps sloppy - should check for "reading" EOF, but couldn't
+        #       # get it to work.  This works for now...
+        #        try:
+        #            buffer = self.netconn.read_very_eager()
+        #       # Check for EOF (remote end closed connection)
+        #       # Doesn't work if do it this way...
+        #       #if buffer == '':
+        #       #    break
+        #            output += buffer
+        #       # Sleep for 500 ms
+        #            time.sleep(0.500)
+        #            max_wait -= 0.500
+        #        except EOFError:
+        #            break
+
         if self.verbose:
-            print('Node authentication banner:\n{}'.format(output))
-            print('Logging in as {}...'.format(self.username))
-        self.netconn.write(self.username + '\n')
-        output += self.netconn.read_until(PASSWORD_PROMPT, TELNET_TIMEOUT)
-        if self.verbose:
-            # Skip first line, node echoing back username
-            secondline = output.find('\n') + 1
-            print('Node password prompt:\n{}'.format(output[secondline:]))
-            print('Submitting password...')
-        self.netconn.write(self.password + '\n')
+            print('EOF:  {}'.format(self.netconn.eof))
+
+        # Send a few Newlines in case its an open reverse telnet connection to get the netinfdev
+        # to echo back a prompt
+        ###self.netconn.write(NEWLINE + NEWLINE)
+
+        # Need to read input for a few seconds and see if get EOF (see Potential Problems, case 3
+        # above)
+        output = self.netconn.read_until(IOS_PROMPT, TELNET_TIMEOUT)
+        output = output.strip()
+        errchk = output.lower()
+        if self.netconn.eof and errchk == IOS_AUTHNOTSETUP:
+            if self.verbose:
+                print('Received:\n{}\n'.format(output))
+                print('EOF:  {}'.format(self.netconn.eof))
+            return None
+        elif self.verbose:
+            print('Output from node:\n{}\n'.format(output))
+        # Check if prompt
+        # Check for EOF
+        # If neither then keep looping until TELNET_TIMEOUT time has passed then abort
+        # connection with error...
+        # Abort on purpose
+        ###assert True == False
+        #!!!#
+
+        ### Redundant - remove
+        #if self.verbose:
+        #    print('Node authentication banner:\n{}'.format(output))
+        #    print('Logging in as {}...'.format(self.username))
+        #self.netconn.write(self.username + '\n')
+        #output += self.netconn.read_until(PASSWORD_PROMPT, TELNET_TIMEOUT)
+        #if self.verbose:
+        #    # Skip first line, node echoing back username
+        #    secondline = output.find('\n') + 1
+        #    print('Node password prompt:\n{}'.format(output[secondline:]))
+        #    print('Submitting password...')
+        #self.netconn.write(self.password + '\n')
         
-        post_login_prompt = [LOGIN_PROMPT, IOS_PROMPT]
-        if self.verbose:
+        ### Hangs because netinfdev is waiting for login info so this reads nothing...
+        post_login_prompt = [LOGIN_PROMPT, PASSWORD_PROMPT, IOS_PROMPT]
+        if self.verbose and self.netinfdev['USE_USERNAME'] or self.netinfdev['USE_PASSWORD']:
             print('Checking for successful login...')
+        elif self.verbose:
+            print('Checking for successful connection...')
+
         # We don't care about/use the match output from expect so assigned to '_'
-        post_login_index, _, post_login_output = node_conn.expect(
-            post_login_prompt, TELNET_TIMEOUT*2)
+        ###post_login_index, _, post_login_output = node_conn.expect(
+        post_login_index, post_login_match, post_login_output = self.netconn.expect(
+            post_login_prompt, TELNET_TIMEOUT)
         if self.verbose:
-            print('Post login output:\n{}'.format(post_login_output))
+            print('Post login output:\n{}, {}, {}'.format(post_login_index, post_login_match,
+                                                          post_login_output))
         if post_login_index == 0:
             # Don't exit, just print diagnostic to stderr
             #sys.exit('Authentication failed')
             print('Authentication failed', file=sys.stderr)
         else:
-            if self.verbose:
+            if self.verbose and self.netinfdev['USE_USERNAME'] or self.netinfdev['USE_PASSWORD']:
                 print('Authentication succeeded')
+            # No authentication
+            else:
+                print('Successfully connected')
 
         return output
 
@@ -262,13 +306,17 @@ class Netinfdev(object):
         if not self.netconn:
             print('Error:  No connection exists.', file=sys.stderr)
             return None
+        elif self.netconn.eof:
+            print('Error:  Connection at EOF', file=sys.stderr)
+            return None
 
         if self.verbose:
             print('Sending command {}...'.format(cmd))
         cmd = cmd.rstrip()
         self.netconn.write(cmd + '\n')
         # Read until node prompt, this should indicate command output is done
-        output = node_conn.read_until(IOS_PROMPT, TELNET_TIMEOUT)
+        ###output = node_conn.read_until(IOS_PROMPT, TELNET_TIMEOUT)
+        output = self.netconn.read_until(IOS_PROMPT, TELNET_TIMEOUT)
         # Strip off last line - node prompt
         lastline = output.rfind('\n')
         cmd_output = output[:lastline]
