@@ -1,6 +1,8 @@
 ---
 #
 # Watch spelling - wrong case or transposed letters will cause weird problems!!!
+# This is an example file
+# Warning: Public file, stored in GitHub, do not use real data!
 #
 - MGMTADDR4: 192.0.2.253
   USERNAME: cisco
