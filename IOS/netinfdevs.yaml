@@ -1,0 +1,11 @@
+---
+#
+# Watch spelling - wrong case or transposed letters will cause weird problems!!!
+#
+- MGMTADDR4: 192.0.2.253
+  USERNAME: cisco
+  PASSWORD: cisco
+  ENABLE_PASS: cisco
+  DEVTYPE: 'ios-rtr'
+  HOSTNAME: R1
+  TELNET_PORT: '23'
