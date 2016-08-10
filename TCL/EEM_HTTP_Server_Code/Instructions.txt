@@ -1,0 +1,44 @@
+- Decide where you want to save those files on your router flash
+- Copy the included files to that flash directory
+  - Please note that I hard-coded that directory in http_server.tcl to "disk2:/", you need to change it
+- Enter the following commands
+  Config t
+    event manager directory user policy "disk2:/"     (replace disk2:/ with your flash directory)
+	event manager policy http_server.tcl
+	end
+  event manager run http_server.tcl
+- Note that if you have the IOS HTTP server feature enabled in your router, the script will fail
+- Open a browser
+- In the address field, enter your router IP address.
+- You should see your page.
+
+File type supported:
+- .htm and .html					Standrd HTML pages
+- .gif, .jpg, .jpeg, .ico, .png		Image files
+- .tcl								Script files
+  The script will run and it can wtite back to the client browser using the "puts command"
+  Example:
+
+puts "HTTP/1.1 200 OK
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: binary
+
+<html>
+  ...
+</html>"
+
+- List of files:
+    favicon.ico
+	logo.gif
+	sitearea-nav.jpg
+	Application_1.tcl
+	Application_2.tcl
+	Application_3.tcl
+	Application_4.tcl
+	http_server.tcl
+	Mihyar.tcl
+	runcli.tcl
+	sendemail.tcl
+	StaticPage.html
+	index.html
+	Instructions.txt
