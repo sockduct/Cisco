@@ -1,5 +1,10 @@
 ####################################################################################################
 # TCL Script to parse ARP entries and purge dynamic ones by adding/removing from config mode
+#
+# Possible Improvements:
+# * Specify preflst using trailing dot - see comment below, need to test
+# * See if way to make sure no non-connected subnets have arp entries
+#
 
 # Purge prefixes
 set preflst {172.16 172.26 192.0.2 192.168}
